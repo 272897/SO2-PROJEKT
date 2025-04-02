@@ -44,7 +44,10 @@ private:
     my_counting_semaphore waiter;  // Semaphore to control the number of eating philosophers
 
 public:
-    Waiter(int n) : forks(n, true), waiter(n - 1) {}
+    bool stop_flag = false; // Flag to stop philosophers after a set time
+    vector<int> eat_count;  // Counter to track how many times each philosopher has eaten
+
+    Waiter(int n) : forks(n, true), waiter(n - 1), eat_count(n, 0) {}
 
     // Function to pick up forks
     void pick_up_forks(int id) {
@@ -70,6 +73,7 @@ public:
         lock_guard<mutex> lock(mtx);
         forks[id] = true;
         forks[(id + 1) % forks.size()] = true;
+        eat_count[id]++; // Increment the eat counter
         cv.notify_all();
 
         waiter.release();  // Allow another philosopher to start eating
@@ -85,7 +89,7 @@ public:
 // Function to simulate a philosopher's behavior
 void philosopher(int id, Waiter &waiter, mt19937 &rng) {
     uniform_int_distribution<int> dist(500, 2000);  // Random wait time between 500-2000ms
-    while (true) {
+    while (!waiter.stop_flag) { // Stop when flag is set
         waiter.print_status("is thinking.", id);
         this_thread::sleep_for(chrono::milliseconds(dist(rng)));
 
@@ -126,9 +130,19 @@ int main(int argc, char* argv[]) {
         philosophers.emplace_back(philosopher, i, ref(waiter), ref(rng));
     }
 
-    // Join philosopher threads (they run indefinitely)
+    // Let the simulation run for 10 seconds
+    this_thread::sleep_for(chrono::seconds(10));
+    waiter.stop_flag = true; // Signal philosophers to stop
+
+    // Join philosopher threads (they run indefinitely until stopped)
     for (auto &t : philosophers) {
         t.join();
+    }
+
+    // Print statistics after simulation ends
+    cout << "\nStatistics:\n";
+    for (int i = 0; i < num_philosophers; ++i) {
+        cout << "Philosopher " << i << " ate " << waiter.eat_count[i] << " times.\n";
     }
 
     return 0;
