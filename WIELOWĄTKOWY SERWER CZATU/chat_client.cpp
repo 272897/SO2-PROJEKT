@@ -1,9 +1,3 @@
-/**
- * chat_client.cpp
- * 
- * A simple client for connecting to the multithreaded chat server, implemented in C++
- * Windows version using WinSock2.
- */
 
  #include <iostream>
  #include <string>
@@ -13,8 +7,7 @@
  #include <winsock2.h>
  #include <ws2tcpip.h>
  #include <windows.h>
- 
- // Need to link with Ws2_32.lib
+
  #pragma comment(lib, "Ws2_32.lib")
  
  #define BUFFER_SIZE 2048
