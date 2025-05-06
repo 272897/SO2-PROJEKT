@@ -1,11 +1,3 @@
-/**
- * multithreaded_chat_server.cpp
- * 
- * A multithreaded chat server using std::thread, std::mutex, and std::condition_variable
- * to synchronize access to critical sections.
- * Windows version using WinSock2.
- */
-
  #include <iostream>
  #include <string>
  #include <vector>
@@ -17,7 +9,7 @@
  #include <ws2tcpip.h>
  #include <windows.h>
  
- // Need to link with Ws2_32.lib
+
  #pragma comment(lib, "Ws2_32.lib")
  
  #define MAX_CLIENTS 50
