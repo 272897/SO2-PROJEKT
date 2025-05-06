@@ -1,5 +1,174 @@
 # README
 
+# Wielowątkowy Serwer Czatu z Klientem
+
+## Opis problemu
+
+Projekt implementuje wielowątkowy serwer czatu wraz z klientem, umożliwiający komunikację tekstową między wieloma użytkownikami w czasie rzeczywistym. Serwer obsługuje wielu klientów jednocześnie, przydzielając każdemu połączeniu osobny wątek. Użytkownicy mogą wysyłać wiadomości, które są dystrybuowane do wszystkich podłączonych klientów. System utrzymuje również historię czatu, dzięki czemu nowi użytkownicy po dołączeniu mogą zobaczyć poprzednie wiadomości.
+
+Główne wyzwania projektu obejmują:
+- Równoczesne zarządzanie wieloma połączeniami klientów
+- Synchronizacja dostępu do współdzielonych zasobów
+- Bezpieczne dołączanie i odłączanie klientów
+- Skuteczne rozpowszechnianie wiadomości pomiędzy użytkownikami
+- Zarządzanie historią czatu
+- Obsługa zamknięcia serwera i klienta
+
+## Instrukcje uruchomienia
+
+### Wymagania wstępne
+- System operacyjny Windows
+- Kompilator C++ obsługujący standard C++17
+- MinGW z biblioteką ws2_32 (WinSock2)
+- Make (opcjonalnie)
+
+### Kompilacja
+Możesz skompilować projekt za pomocą dołączonego pliku Makefile:
+
+```
+make all
+```
+
+Lub ręcznie za pomocą kompilatora:
+
+```
+g++ -Wall -std=c++17 -pthread -o chat_server.exe chat_server.cpp -lws2_32
+g++ -Wall -std=c++17 -pthread -o chat_client.exe chat_client.cpp -lws2_32
+```
+
+### Uruchomienie serwera
+```
+chat_server.exe
+```
+
+Serwer domyślnie nasłuchuje na porcie 8888 i może obsłużyć do 50 klientów jednocześnie.
+
+### Uruchomienie klienta
+```
+chat_client.exe <adres_ip_serwera>
+```
+
+Na przykład, aby połączyć się z serwerem uruchomionym na tym samym komputerze:
+```
+chat_client.exe 127.0.0.1
+```
+
+Po uruchomieniu klienta zostaniesz poproszony o podanie nazwy użytkownika, a następnie będziesz mógł wysyłać i odbierać wiadomości.
+
+### Zamykanie
+- Serwer można zamknąć naciskając Ctrl+C w oknie terminala
+- Klient może się rozłączyć przez wpisanie `/quit` lub naciśnięcie Ctrl+C
+
+## Wątki i ich reprezentacja
+
+### Serwer
+1. **Wątek główny**
+   - Odpowiedzialny za inicjalizację serwera
+   - Nasłuchuje nowych połączeń za pomocą funkcji `accept()`
+   - Tworzy nowe wątki klientów dla każdego połączenia
+   - Obsługuje sygnały zakończenia (CTRL+C, zamknięcie okna)
+
+2. **Wątki klientów** (tworzone dla każdego połączenia)
+   - Funkcja `handle_client(std::shared_ptr<Client> client)`
+   - Każdy wątek obsługuje komunikację z jednym klientem
+   - Odbiera wiadomości od przypisanego klienta
+   - Przetwarza polecenia klienta (np. `/quit`)
+   - Rozpowszechnia wiadomości do innych klientów
+   - Czyści zasoby po rozłączeniu klienta
+
+### Klient
+1. **Wątek główny**
+   - Inicjalizuje połączenie z serwerem
+   - Obsługuje wprowadzanie danych przez użytkownika
+   - Wysyła wiadomości do serwera
+   - Obsługuje sygnały zakończenia (CTRL+C, zamknięcie okna)
+
+2. **Wątek odbierający** (`receive_messages()`)
+   - Nasłuchuje i odbiera wiadomości przychodzące od serwera
+   - Wyświetla te wiadomości użytkownikowi
+   - Wykrywa rozłączenie serwera
+
+## Sekcje krytyczne i ich rozwiązania
+
+### 1. Dostęp do listy klientów
+**Problem**: Wiele wątków próbuje jednocześnie modyfikować listę klientów (dodawanie, usuwanie, przeszukiwanie).
+
+**Rozwiązanie**: Użycie muteksu `clients_mutex` do synchronizacji dostępu:
+```cpp
+std::mutex clients_mutex;
+```
+
+**Zastosowanie**:
+- Blokowanie dostępu podczas dodawania nowego klienta
+- Blokowanie podczas usuwania klienta po rozłączeniu
+- Blokowanie podczas przeszukiwania listy w celu wysłania wiadomości do wszystkich
+
+### 2. Ograniczenie liczby klientów
+**Problem**: Potrzeba ograniczenia maksymalnej liczby równoczesnych połączeń.
+
+**Rozwiązanie**: Implementacja własnego semafora (`Semaphore`), który kontroluje dostępność slotów dla klientów:
+```cpp
+class Semaphore {
+private:
+    std::mutex mutex;
+    std::condition_variable condition;
+    unsigned int count;
+public:
+    Semaphore(unsigned int initial_count) : count(initial_count) {}
+    void wait(); // Dekrementacja licznika, blokuje gdy count == 0
+    void post(); // Inkrementacja licznika, powiadamia jeden czekający wątek
+};
+```
+
+**Zastosowanie**:
+- Wątek główny wywołuje `connection_semaphore.wait()` przed akceptacją nowego klienta
+- Wątek klienta wywołuje `connection_semaphore.post()` po rozłączeniu
+
+### 3. Dostęp do historii czatu
+**Problem**: Wiele wątków może jednocześnie modyfikować i odczytywać historię czatu.
+
+**Rozwiązanie**: Użycie tego samego muteksu `clients_mutex` do synchronizacji dostępu do historii czatu:
+```cpp
+std::vector<std::string> chat_history;
+```
+
+**Zastosowanie**:
+- Blokowanie podczas dodawania nowej wiadomości do historii
+- Blokowanie podczas wysyłania historii do nowo podłączonego klienta
+
+### 4. Wypisywanie na konsolę
+**Problem**: W kliencie, wątek główny i wątek odbierający mogą jednocześnie próbować wypisywać dane na konsolę.
+
+**Rozwiązanie**: Użycie dedykowanego muteksu `cout_mutex` dla operacji na konsoli:
+```cpp
+std::mutex cout_mutex;
+```
+
+**Zastosowanie**:
+- Blokowanie podczas wypisywania komunikatów o błędach
+- Blokowanie podczas wypisywania odebranych wiadomości
+
+### 5. Flaga stanu działania
+**Problem**: Bezpieczna sygnalizacja zakończenia działania programu między wątkami.
+
+**Rozwiązanie**: Użycie zmiennej atomowej `server_running` oraz `running`:
+```cpp
+std::atomic<bool> server_running(true);  // W serwerze
+std::atomic<bool> running(true);         // W kliencie
+```
+
+**Zastosowanie**:
+- Sygnalizacja zakończenia głównej pętli serwera przy obsłudze sygnału Ctrl+C
+- Sygnalizacja zakończenia głównej pętli klienta przy obsłudze sygnału Ctrl+C
+- Sygnalizacja między wątkami klienta o konieczności zakończenia pracy
+
+## Podsumowanie
+
+Projekt demonstruje zastosowanie technik programowania wielowątkowego w C++ do implementacji sieciowego systemu czatu. Dzięki zastosowaniu odpowiednich mechanizmów synchronizacji (mutex, zmienne warunkowe, zmienne atomowe, semafory), system efektywnie zarządza współdzielonymi zasobami i zapewnia bezpieczną komunikację między wieloma klientami jednocześnie.
+
+Implementacja wykorzystuje nowoczesne funkcje C++17, takie jak inteligentne wskaźniki (`std::shared_ptr`), które pomagają w zarządzaniu pamięcią i cyklem życia obiektów klienta. Kod jest zorganizowany w sposób przejrzysty, z jasnym podziałem odpowiedzialności między poszczególnymi wątkami i komponentami systemu.
+
+# Problem jedzących filozofów
 ## Opis projektu
 
 Ten projekt to implementacja problemu ucztujących filozofów, która zapewnia synchronizację i zapobiega zakleszczeniom oraz zagłodzeniu. Program symuluje filozofów siedzących przy stole, którzy na zmianę myślą i jedzą, korzystając ze wspólnych widelców. Synchronizacja dostępu do zasobów odbywa się przy użyciu semaforów, mutexów i mechanizmu monitorów, co pozwala na jednoczesne jedzenie maksymalnie N-1 filozofów.
