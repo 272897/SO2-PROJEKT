@@ -281,7 +281,7 @@ void handle_client(std::shared_ptr<Client> client) {
         
         // Format message and broadcast to all clients
         std::string message = client->username + ": " + buffer + "\n";
-        send_message_to_all(message, client->id, true); // teraz wysyła też do siebie
+        send_message_to_all(message, client->id, true); 
 
         std::cout << "Message from " << client->username << " (ID: " << client->id << "): " << buffer << std::endl;
     }
