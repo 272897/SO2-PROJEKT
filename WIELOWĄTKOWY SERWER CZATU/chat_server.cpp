@@ -8,7 +8,6 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 
-// Need to link with Ws2_32.lib
 #pragma comment(lib, "Ws2_32.lib")
 
 #define MAX_CLIENTS 50
