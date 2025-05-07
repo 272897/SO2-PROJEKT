@@ -151,22 +151,36 @@ std::mutex cout_mutex;
 ### 5. Flaga stanu działania
 **Problem**: Bezpieczna sygnalizacja zakończenia działania programu między wątkami.
 
-**Rozwiązanie**: Użycie zmiennej atomowej `server_running` oraz `running`:
+**Rozwiązanie**: Użycie zwykłych zmiennych typu bool z muteksami dla bezpiecznego dostępu:
 ```cpp
-std::atomic<bool> server_running(true);  // W serwerze
-std::atomic<bool> running(true);         // W kliencie
+bool server_running = true;       // W serwerze
+std::mutex server_running_mutex;  // Mutex dla server_running
+
+bool running = true;              // W kliencie
+std::mutex running_mutex;         // Mutex dla running
 ```
 
 **Zastosowanie**:
-- Sygnalizacja zakończenia głównej pętli serwera przy obsłudze sygnału Ctrl+C
-- Sygnalizacja zakończenia głównej pętli klienta przy obsłudze sygnału Ctrl+C
-- Sygnalizacja między wątkami klienta o konieczności zakończenia pracy
+- Bezpieczna modyfikacja i odczyt flagi `server_running` przy użyciu muteksu `server_running_mutex`
+- Bezpieczna modyfikacja i odczyt flagi `running` przy użyciu muteksu `running_mutex`
+- Sygnalizacja zakończenia między wątkami z synchronizacją dostępu
+
+### 6. Licznik klientów
+**Problem**: Bezpieczne śledzenie liczby aktywnych klientów.
+
+**Rozwiązanie**: Użycie zwykłej zmiennej `client_count` z dedykowanym muteksem:
+```cpp
+int client_count = 0;
+std::mutex client_count_mutex;
+```
+
+**Zastosowanie**:
+- Bezpieczna inkrementacja licznika przy podłączeniu nowego klienta
+- Bezpieczna dekrementacja licznika przy rozłączeniu klienta
 
 ## Podsumowanie
 
-Projekt demonstruje zastosowanie technik programowania wielowątkowego w C++ do implementacji sieciowego systemu czatu. Dzięki zastosowaniu odpowiednich mechanizmów synchronizacji (mutex, zmienne warunkowe, zmienne atomowe, semafory), system efektywnie zarządza współdzielonymi zasobami i zapewnia bezpieczną komunikację między wieloma klientami jednocześnie.
-
-Implementacja wykorzystuje nowoczesne funkcje C++17, takie jak inteligentne wskaźniki (`std::shared_ptr`), które pomagają w zarządzaniu pamięcią i cyklem życia obiektów klienta. Kod jest zorganizowany w sposób przejrzysty, z jasnym podziałem odpowiedzialności między poszczególnymi wątkami i komponentami systemu.
+Projekt demonstruje zastosowanie technik programowania wielowątkowego w C++ do implementacji sieciowego systemu czatu. Dzięki zastosowaniu odpowiednich mechanizmów synchronizacji (mutex, zmienne warunkowe, semafory), system efektywnie zarządza współdzielonymi zasobami i zapewnia bezpieczną komunikację między wieloma klientami jednocześnie.
 
 # Problem jedzących filozofów
 ## Opis projektu
