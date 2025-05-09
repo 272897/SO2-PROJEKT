@@ -1,5 +1,6 @@
 # README
-
+## Systemy operacyjne 2 - Projekt 
+### Igor Gołębiowski, prowadzący Damian Raczkowski
 # Wielowątkowy Serwer Czatu z Klientem
 
 ## Opis problemu
